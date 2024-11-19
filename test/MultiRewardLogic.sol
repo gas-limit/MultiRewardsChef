@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.7.6;
 
-import { SafeMath} from "../dependencies/openzeppelin/contracts/SafeMath.sol";
-import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
+import "../src/dependencies/openzeppelin/contracts/SafeMath.sol";
+import "../src/dependencies/openzeppelin/contracts/IERC20.sol";
 
-contract StandaloneMultiRewarder {
+contract MultiRewardLogic {
 
     using SafeMath for uint256;
 
@@ -68,14 +68,14 @@ contract StandaloneMultiRewarder {
     // °✰════════════════════╛
 
     // Stake aToken
-    function stakeIncentiveTokens(address _aToken, uint256 _amount) external {
+    function stakeIncentiveTokens(address _aToken, uint256 _amount, address _user) public {
         require(_amount > 0, "amount must be greater than 0");
-        calculateUserPending(msg.sender, _aToken);
+        calculateUserPending(_user, _aToken);
         // Update rewards before modifying stakes to ensure proper accounting
         updateMultiRewardAccounting(_aToken);
         
         multiTotalStaked[_aToken] = multiTotalStaked[_aToken].add(_amount);
-        multiUserStaked[msg.sender][_aToken] = multiUserStaked[msg.sender][_aToken].add(_amount);
+        multiUserStaked[_user][_aToken] = multiUserStaked[_user][_aToken].add(_amount);
 
         address[] memory rewardTokenList = multiRewardTokens[_aToken];
         uint256 rewardTokenCount = rewardTokenList.length;
@@ -83,53 +83,47 @@ contract StandaloneMultiRewarder {
         for (uint256 i = 0; i < rewardTokenCount; i++) {
             address rewardToken = rewardTokenList[i];
             // Set the offset to current rewardPerToken to start counting from this point
-            multiUserRewardOffset[msg.sender][_aToken][rewardToken] = 
+            multiUserRewardOffset[_user][_aToken][rewardToken] = 
                 _simulateRewardPerToken(_aToken, rewardToken, multiTotalStaked[_aToken].sub(_amount));
         }
 
-       IERC20(_aToken).transferFrom(msg.sender, address(this), _amount);
-
-        emit multiStakeRecorded(msg.sender, _aToken, _amount);
+        emit multiStakeRecorded(_user, _aToken, _amount);
     }
 
     // Withdraw aToken
-    function unstakeIncentiveTokens(address _aToken, uint256 _amount) external {
+    function unstakeIncentiveTokens(address _aToken, uint256 _amount, address _user) public {
         require(_amount > 0, "amount must be greater than 0");
-        require(_amount <= multiUserStaked[msg.sender][_aToken], "insufficient staked amount");
-        
-        claimMultiRewards(_aToken);
-        uint256 stakedAmount = multiUserStaked[msg.sender][_aToken];
+        // assume check for sufficient staked amount is done in parent contract
+        claimMultiRewards(_aToken, _user);
+        uint256 stakedAmount = multiUserStaked[_user][_aToken];
         require(stakedAmount >= _amount, "insufficient staked amount");
-        multiUserStaked[msg.sender][_aToken] = stakedAmount.sub(_amount);
+        multiUserStaked[_user][_aToken] = stakedAmount.sub(_amount);
         multiTotalStaked[_aToken] = multiTotalStaked[_aToken].sub(_amount);
 
-        IERC20(_aToken).transfer(msg.sender, _amount);
-
-        emit multiUnstakeRecorded(msg.sender, _aToken, _amount);
+        emit multiUnstakeRecorded(_user, _aToken, _amount);
     }
 
     // Harvest rewards
-    function claimMultiRewards(address _aToken) public {
+    function claimMultiRewards(address _aToken, address _user) public {
         updateMultiRewardAccounting(_aToken);
         address[] memory rewardTokenList = multiRewardTokens[_aToken];
         uint256 rewardTokenCount = rewardTokenList.length;
         for (uint256 i = 0; i < rewardTokenCount; i++) {
             address rewardToken = rewardTokenList[i];
             uint256 earnedAmountScaled = (multiRewardPerToken[_aToken][rewardToken] -
-                multiUserRewardOffset[msg.sender][_aToken][
+                multiUserRewardOffset[_user][_aToken][
                     rewardToken
-                ]) * multiUserStaked[msg.sender][_aToken];
+                ]) * multiUserStaked[_user][_aToken];
             uint256 earnedAmountWithoutPending = earnedAmountScaled.div(SCALE);
-            uint256 earnedAmountActual = earnedAmountWithoutPending + multiUserPendingRewards[msg.sender][rewardToken];
+            uint256 earnedAmountActual = earnedAmountWithoutPending + multiUserPendingRewards[_user][rewardToken];
             if (earnedAmountActual == 0) {
                 continue;
             }
-            multiUserRewardOffset[msg.sender][_aToken][
+            multiUserRewardOffset[_user][_aToken][
                 rewardToken
             ] = multiRewardPerToken[_aToken][rewardToken];
-            IERC20(rewardToken).transfer(msg.sender, earnedAmountActual);
-
-            emit multiRewardHarvested(msg.sender, _aToken, rewardToken, earnedAmountActual);
+            // IERC20(rewardToken).transfer(_user, earnedAmountActual);
+            emit multiRewardHarvested(_user, _aToken, rewardToken, earnedAmountActual);
         }
     }
 
@@ -222,12 +216,12 @@ contract StandaloneMultiRewarder {
     }
 
     function depositReward(address _rewardAddress, uint256 _amount) external onlyIncentiveAdmin {
-        IERC20(_rewardAddress).transferFrom(msg.sender, address(this), _amount);
+        // IERC20(_rewardAddress).transferFrom(msg.sender, address(this), _amount);
         emit multiRewardDeposited(_rewardAddress, _amount);
     }
 
     function withdrawReward(address _rewardAddress, uint256 _amount) external onlyIncentiveAdmin {
-        IERC20(_rewardAddress).transfer(msg.sender, _amount);
+        // IERC20(_rewardAddress).transfer(msg.sender, _amount);
         emit multiRewardWithdrawn(_rewardAddress, _amount);
     }
 

@@ -16,6 +16,8 @@ This repository offers a suite of smart contracts designed to facilitate multi-t
 2. **MasterChefRewarder**: Integrates with MasterChef to provide multi-token rewards for liquidity providers.
 3. **ChefIncentivesRewarder**: Extends ChefIncentivesController, rewarding users holding aTokens or LP tokens.
 
+Each directory includes a README.md file with detailed information on the contract's purpose, implementation instructions, and usage examples.
+
 ---
 
 ## Getting Started
@@ -47,21 +49,6 @@ forge build
 Execute the test suite:
 ```bash
 forge test
-```
-
----
-
-## Deployment
-
-Deploy contracts as per your requirements:
-
-- **StandaloneRewarder**: For independent staking and rewards.
-- **MasterChefRewarder**: To integrate with MasterChef.
-- **ChefIncentivesRewarder**: For use with ChefIncentivesController.
-
-Modify deployment scripts in the `script/` directory accordingly and run:
-```bash
-forge script script/Deploy.s.sol --broadcast
 ```
 
 ---

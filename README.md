@@ -1,66 +1,92 @@
-## Foundry
+# Multi-Token Rewards Contracts
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+This repository offers a suite of smart contracts designed to distribute rewards in multiple tokens across various DeFi scenarios. Developed with Foundry, these contracts are open-source and intended as a public good to benefit the broader blockchain community.
 
-Foundry consists of:
+---
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## Contracts Overview
 
-## Documentation
+1. **StandaloneRewarder**: Enables direct token staking and rewards without external dependencies.
+2. **MasterChefRewarder**: Integrates with MasterChef to provide multi-token rewards for liquidity providers.
+3. **ChefIncentivesRewarder**: Extends ChefIncentivesController, rewarding users holding aTokens or LP tokens.
 
-https://book.getfoundry.sh/
+---
 
-## Usage
+## Getting Started
 
-### Build
+Ensure Foundry is installed. If not, follow the instructions at [Foundry's official site](https://getfoundry.sh).
 
-```shell
-$ forge build
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-repo-name.git
+   cd your-repo-name
+   ```
+
+2. Install dependencies:
+   ```bash
+   forge install
+   ```
+
+### Build the Project
+
+Compile the contracts:
+```bash
+forge build
 ```
 
-### Test
+### Run Tests
 
-```shell
-$ forge test
+Execute the test suite:
+```bash
+forge test
 ```
 
-### Format
+---
 
-```shell
-$ forge fmt
+## Deployment
+
+Deploy contracts as per your requirements:
+
+- **StandaloneRewarder**: For independent staking and rewards.
+- **MasterChefRewarder**: To integrate with MasterChef.
+- **ChefIncentivesRewarder**: For use with ChefIncentivesController.
+
+Modify deployment scripts in the `script/` directory accordingly and run:
+```bash
+forge script script/Deploy.s.sol --broadcast
 ```
 
-### Gas Snapshots
+---
 
-```shell
-$ forge snapshot
-```
+## Contribution
 
-### Anvil
+Contributions are welcome. To contribute:
 
-```shell
-$ anvil
-```
+1. Fork the repository.
+2. Create a new branch:
+   ```bash
+   git checkout -b feature-name
+   ```
+3. Commit your changes:
+   ```bash
+   git commit -m "Description of changes"
+   ```
+4. Push the branch:
+   ```bash
+   git push origin feature-name
+   ```
+5. Open a pull request.
 
-### Deploy
+---
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
+## License
 
-### Cast
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-```shell
-$ cast <subcommand>
-```
+---
 
-### Help
+## Acknowledgment
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+This project is released as a public good to support and enhance the DeFi ecosystem. For questions or support, please open an issue on GitHub. 

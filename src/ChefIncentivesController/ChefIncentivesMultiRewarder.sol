@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.7.6;
 
-import "../dependencies/openzeppelin/contracts/IERC20.sol";
-import "../dependencies/openzeppelin/contracts/SafeERC20.sol";
-import "../dependencies/openzeppelin/contracts/SafeMath.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 
-contract MultiIncentiveModule {
+contract ChefIncentivesMultiRewarder {
 
     using SafeMath for uint256;
 
@@ -123,7 +123,7 @@ contract MultiIncentiveModule {
             multiUserRewardOffset[_user][_aToken][
                 rewardToken
             ] = multiRewardPerToken[_aToken][rewardToken];
-            // IERC20(rewardToken).transfer(_user, earnedAmountActual);
+
             emit multiRewardHarvested(_user, _aToken, rewardToken, earnedAmountActual);
         }
     }

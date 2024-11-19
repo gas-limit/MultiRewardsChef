@@ -1,6 +1,12 @@
-# Multi-Token Rewards Contracts
+# MultiRewardsChef
 
-This repository offers a suite of smart contracts designed to distribute rewards in multiple tokens across various DeFi scenarios. Developed with Foundry, these contracts are open-source and intended as a public good to benefit the broader blockchain community.
+This repository offers a suite of smart contracts designed to facilitate multi-token reward distribution across various DeFi scenarios. Developed using Foundry, these contracts are open-source and intended as a public good to benefit the broader blockchain community.
+
+---
+
+## Disclaimer
+
+**Important**: These contracts have not undergone formal security audits. They are provided "as-is" without any warranties or guarantees. The author assumes no responsibility for any issues, losses, or damages arising from the use of this code. Users are advised to conduct their own thorough testing and audits before deploying these contracts in a production environment.
 
 ---
 

@@ -4,7 +4,7 @@ pragma solidity 0.7.6;
 import { SafeMath} from "../dependencies/openzeppelin/contracts/SafeMath.sol";
 import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
 
-contract ChefIncentivesMultiRewarder {
+contract MasterchefMultiRewards {
 
     using SafeMath for uint256;
 
@@ -68,14 +68,14 @@ contract ChefIncentivesMultiRewarder {
     // °✰════════════════════╛
 
     // Stake aToken
-    function _stakeIncentiveTokens(address _aToken, uint256 _amount, address _user) internal {
+    function stakeIncentiveTokens(address _aToken, uint256 _amount) internal {
         require(_amount > 0, "amount must be greater than 0");
-        calculateUserPending(_user, _aToken);
+        calculateUserPending(msg.sender, _aToken);
         // Update rewards before modifying stakes to ensure proper accounting
         updateMultiRewardAccounting(_aToken);
         
         multiTotalStaked[_aToken] = multiTotalStaked[_aToken].add(_amount);
-        multiUserStaked[_user][_aToken] = multiUserStaked[_user][_aToken].add(_amount);
+        multiUserStaked[msg.sender][_aToken] = multiUserStaked[msg.sender][_aToken].add(_amount);
 
         address[] memory rewardTokenList = multiRewardTokens[_aToken];
         uint256 rewardTokenCount = rewardTokenList.length;
@@ -83,47 +83,47 @@ contract ChefIncentivesMultiRewarder {
         for (uint256 i = 0; i < rewardTokenCount; i++) {
             address rewardToken = rewardTokenList[i];
             // Set the offset to current rewardPerToken to start counting from this point
-            multiUserRewardOffset[_user][_aToken][rewardToken] = 
+            multiUserRewardOffset[msg.sender][_aToken][rewardToken] = 
                 _simulateRewardPerToken(_aToken, rewardToken, multiTotalStaked[_aToken].sub(_amount));
         }
 
-        emit multiStakeRecorded(_user, _aToken, _amount);
+        emit multiStakeRecorded(msg.sender, _aToken, _amount);
     }
 
     // Withdraw aToken
-    function _unstakeIncentiveTokens(address _aToken, uint256 _amount, address _user) internal {
+    function _unstakeIncentiveTokens(address _aToken, uint256 _amount) internal {
         require(_amount > 0, "amount must be greater than 0");
         // assume check for sufficient staked amount is done in parent contract
-        _claimMultiRewards(_aToken, _user);
-        uint256 stakedAmount = multiUserStaked[_user][_aToken];
+        _claimMultiRewards(_aToken);
+        uint256 stakedAmount = multiUserStaked[msg.sender][_aToken];
         require(stakedAmount >= _amount, "insufficient staked amount");
-        multiUserStaked[_user][_aToken] = stakedAmount.sub(_amount);
+        multiUserStaked[msg.sender][_aToken] = stakedAmount.sub(_amount);
         multiTotalStaked[_aToken] = multiTotalStaked[_aToken].sub(_amount);
 
-        emit multiUnstakeRecorded(_user, _aToken, _amount);
+        emit multiUnstakeRecorded(msg.sender, _aToken, _amount);
     }
 
     // Harvest rewards
-    function _claimMultiRewards(address _aToken, address _user) internal {
+    function _claimMultiRewards(address _aToken) internal {
         updateMultiRewardAccounting(_aToken);
         address[] memory rewardTokenList = multiRewardTokens[_aToken];
         uint256 rewardTokenCount = rewardTokenList.length;
         for (uint256 i = 0; i < rewardTokenCount; i++) {
             address rewardToken = rewardTokenList[i];
             uint256 earnedAmountScaled = (multiRewardPerToken[_aToken][rewardToken] -
-                multiUserRewardOffset[_user][_aToken][
+                multiUserRewardOffset[msg.sender][_aToken][
                     rewardToken
-                ]) * multiUserStaked[_user][_aToken];
+                ]) * multiUserStaked[msg.sender][_aToken];
             uint256 earnedAmountWithoutPending = earnedAmountScaled.div(SCALE);
-            uint256 earnedAmountActual = earnedAmountWithoutPending + multiUserPendingRewards[_user][rewardToken];
+            uint256 earnedAmountActual = earnedAmountWithoutPending + multiUserPendingRewards[msg.sender][rewardToken];
             if (earnedAmountActual == 0) {
                 continue;
             }
-            multiUserRewardOffset[_user][_aToken][
+            multiUserRewardOffset[msg.sender][_aToken][
                 rewardToken
             ] = multiRewardPerToken[_aToken][rewardToken];
 
-            emit multiRewardHarvested(_user, _aToken, rewardToken, earnedAmountActual);
+            emit multiRewardHarvested(msg.sender, _aToken, rewardToken, earnedAmountActual);
         }
     }
 

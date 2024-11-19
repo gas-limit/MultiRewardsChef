@@ -57,21 +57,19 @@ The `StandaloneMultiRewarder` contract is a flexible reward distribution module 
 
 ### User Functions
 
-#### `stakeIncentiveTokens(address _aToken, uint256 _amount, address _user)`
+#### `stakeIncentiveTokens(address _aToken, uint256 _amount)`
 Stake tokens to start earning rewards.
 
 - **Parameters**:
   - `_aToken`: The token address to be staked.
   - `_amount`: Amount of tokens to stake.
-  - `_user`: Address of the user staking tokens.
 
-#### `_unstakeIncentiveTokens(address _aToken, uint256 _amount, address _user)`
+#### `_unstakeIncentiveTokens(address _aToken, uint256 _amount)`
 Unstake tokens and claim rewards.
 
 - **Parameters**:
   - `_aToken`: The token address to be unstaked.
   - `_amount`: Amount of tokens to unstake.
-  - `_user`: Address of the user unstaking tokens.
 
 #### `previewEarned(address _user, address _aToken)`
 View pending rewards for a specific user and staked token.

@@ -2,9 +2,10 @@
 pragma solidity 0.7.6;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 
-contract ChefIncentivesMultiRewarder {
+contract StandaloneMultiRewarder {
 
     using SafeMath for uint256;
 
@@ -68,7 +69,7 @@ contract ChefIncentivesMultiRewarder {
     // °✰════════════════════╛
 
     // Stake aToken
-    function _stakeIncentiveTokens(address _aToken, uint256 _amount, address _user) internal {
+    function stakeIncentiveTokens(address _aToken, uint256 _amount, address _user) external {
         require(_amount > 0, "amount must be greater than 0");
         calculateUserPending(_user, _aToken);
         // Update rewards before modifying stakes to ensure proper accounting
@@ -87,18 +88,23 @@ contract ChefIncentivesMultiRewarder {
                 _simulateRewardPerToken(_aToken, rewardToken, multiTotalStaked[_aToken].sub(_amount));
         }
 
+        SafeERC20.safeTransferFrom(IERC20(_aToken), _user, address(this), _amount);
+
         emit multiStakeRecorded(_user, _aToken, _amount);
     }
 
     // Withdraw aToken
-    function _unstakeIncentiveTokens(address _aToken, uint256 _amount, address _user) internal {
+    function _unstakeIncentiveTokens(address _aToken, uint256 _amount, address _user) external {
         require(_amount > 0, "amount must be greater than 0");
-        // assume check for sufficient staked amount is done in parent contract
+        require(_amount <= multiUserStaked[_user][_aToken], "insufficient staked amount");
+        
         _claimMultiRewards(_aToken, _user);
         uint256 stakedAmount = multiUserStaked[_user][_aToken];
         require(stakedAmount >= _amount, "insufficient staked amount");
         multiUserStaked[_user][_aToken] = stakedAmount.sub(_amount);
         multiTotalStaked[_aToken] = multiTotalStaked[_aToken].sub(_amount);
+
+        SafeERC20.safeTransfer(IERC20(_aToken), _user, _amount);
 
         emit multiUnstakeRecorded(_user, _aToken, _amount);
     }
@@ -122,7 +128,8 @@ contract ChefIncentivesMultiRewarder {
             multiUserRewardOffset[_user][_aToken][
                 rewardToken
             ] = multiRewardPerToken[_aToken][rewardToken];
-
+            SafeERC20.safeTransfer(IERC20(rewardToken), _user, earnedAmountActual);
+            
             emit multiRewardHarvested(_user, _aToken, rewardToken, earnedAmountActual);
         }
     }

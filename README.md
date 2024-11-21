@@ -12,9 +12,10 @@ This repository offers a suite of smart contracts designed to facilitate multi-t
 
 ## Contracts Overview
 
-1. **StandaloneRewarder**: Enables direct token staking and rewards without external dependencies.
-2. **MasterChefRewarder**: Integrates with MasterChef to provide multi-token rewards for liquidity providers.
-3. **ChefIncentivesRewarder**: Extends ChefIncentivesController, rewarding users holding aTokens or LP tokens.
+1. **MasterChefRewarder**: Integrates with MasterChef to provide multi-token rewards for liquidity providers.
+2. **ChefIncentivesRewarder**: Extends ChefIncentivesController, rewarding users holding aTokens or LP tokens.
+3. **StandaloneRewarder**: Enables direct token staking and rewards without external dependencies.
+4. **StandaloneRewarderModern**: A modernized version of StandaloneRewarder that uses solidity 0.8 with custom errors, modern libraries like SafeERC20, Ownable2Step, and removal of SafeMath.
 
 Each directory includes a README.md file with detailed information on the contract's purpose, implementation instructions, and usage examples.
 

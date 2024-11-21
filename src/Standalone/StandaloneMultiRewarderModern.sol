@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IERC20 } from "./0.8Dependencies/IERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title StandaloneMultiRewarder
  * @dev A standalone multi-token reward distribution contract for staking tokens such as aTokens or LP tokens.
  * Users earn rewards in multiple tokens simultaneously, with flexible staking and admin controls.
  */
-contract StandaloneMultiRewarder {
+contract StandaloneMultiRewarder is Ownable2Step {
+
+    using SafeERC20 for IERC20;
 
     /// @notice Address of the admin responsible for managing incentives
     address public multiIncentiveAdmin;
@@ -45,6 +50,9 @@ contract StandaloneMultiRewarder {
 
     error ZeroAmount();
     error UnauthorizedCaller();
+    error InsufficientBalance();
+    error RewardExists();
+    error RewardDoesNotExist();
 
     /// @dev Emitted when a user stakes tokens
     event multiStakeRecorded(address indexed user, address indexed aToken, uint256 amount);
@@ -77,18 +85,10 @@ contract StandaloneMultiRewarder {
     event multiRewardWithdrawn(address indexed rewardToken, uint256 amount);
 
     /**
-     * @dev Restricts access to the multiIncentiveAdmin.
-     */
-    modifier onlyIncentiveAdmin() {
-        require(msg.sender == multiIncentiveAdmin, "caller is not the multiIncentiveAdmin");
-        _;
-    }
-
-    /**
      * @dev Initializes the contract and sets the deployer as the multiIncentiveAdmin.
      */
-    constructor() {
-        multiIncentiveAdmin = msg.sender;
+    constructor() Ownable2Step() Ownable(msg.sender){
+        
     }
 
 
@@ -120,7 +120,7 @@ contract StandaloneMultiRewarder {
                 _simulateRewardPerToken(_aToken, rewardToken, multiTotalStaked[_aToken] - _amount);
         }
 
-       IERC20(_aToken).transferFrom(msg.sender, address(this), _amount);
+       IERC20(_aToken).safeTransferFrom(msg.sender, address(this), _amount);
 
         emit multiStakeRecorded(msg.sender, _aToken, _amount);
     }
@@ -130,16 +130,16 @@ contract StandaloneMultiRewarder {
      * @param _amount The amount of tokens to unstake.
      */
     function unstakeIncentiveTokens(address _aToken, uint256 _amount) external {
-        require(_amount > 0, "amount must be greater than 0");
-        require(_amount <= multiUserStaked[msg.sender][_aToken], "insufficient staked amount");
+        if(_amount == 0) revert ZeroAmount();
+        if(_amount > multiUserStaked[msg.sender][_aToken]) revert InsufficientBalance();
         
         claimMultiRewards(_aToken);
         uint256 stakedAmount = multiUserStaked[msg.sender][_aToken];
-        require(stakedAmount >= _amount, "insufficient staked amount");
+        if (stakedAmount < _amount) revert InsufficientBalance();
         multiUserStaked[msg.sender][_aToken] = stakedAmount - _amount;
         multiTotalStaked[_aToken] = multiTotalStaked[_aToken] - _amount;
 
-        IERC20(_aToken).transfer(msg.sender, _amount);
+        IERC20(_aToken).safeTransfer(msg.sender, _amount);
 
         emit multiUnstakeRecorded(msg.sender, _aToken, _amount);
     }
@@ -162,7 +162,7 @@ contract StandaloneMultiRewarder {
                 continue;
             }
             multiUserRewardOffset[msg.sender][_aToken][rewardToken] = multiRewardPerToken[_aToken][rewardToken];
-            IERC20(rewardToken).transfer(msg.sender, earnedAmountActual);
+            IERC20(rewardToken).safeTransfer(msg.sender, earnedAmountActual);
 
             emit multiRewardHarvested(msg.sender, _aToken, rewardToken, earnedAmountActual);
         }
@@ -229,14 +229,11 @@ contract StandaloneMultiRewarder {
         address _aToken,
         address _rewardToken,
         uint256 _rewardsPerSecond
-    ) external onlyIncentiveAdmin {
+    ) external onlyOwner {
         address[] memory rewardTokenList = multiRewardTokens[_aToken];
         // check if reward token already exists
         for (uint256 i = 0; i < rewardTokenList.length; i++) {
-            require(
-                rewardTokenList[i] != _rewardToken,
-                "reward token already exists"
-            );
+            if(rewardTokenList[i] == _rewardToken) revert RewardExists();
         }
 
         multiRewardTokens[_aToken].push(_rewardToken);
@@ -255,9 +252,9 @@ contract StandaloneMultiRewarder {
     function removeIncentiveReward(
         address _aToken,
         address _rewardToken
-    ) external onlyIncentiveAdmin {
+    ) external onlyOwner {
         updateMultiRewardAccounting(_aToken);
-        require(multiRewardPerSecond[_aToken][_rewardToken] != 0, "reward token does not exist");
+        if(multiRewardPerSecond[_aToken][_rewardToken] == 0) revert RewardDoesNotExist();
 
         // Stop accumulating new rewards
         multiRewardPerSecond[_aToken][_rewardToken] = 0;
@@ -272,8 +269,8 @@ contract StandaloneMultiRewarder {
      * @param _rewardToken The address of the reward token.
      * @param _rewardsPerSecond The new reward rate per second.
      */
-    function adjustRewardRate(address _aToken, address _rewardToken, uint256 _rewardsPerSecond) external onlyIncentiveAdmin {
-        require(multiRewardPerSecond[_aToken][_rewardToken] != 0, "reward token does not exist");
+    function adjustRewardRate(address _aToken, address _rewardToken, uint256 _rewardsPerSecond) external onlyOwner {
+        if(multiRewardPerSecond[_aToken][_rewardToken] == 0) revert RewardDoesNotExist();
         updateMultiRewardAccounting(_aToken);
         multiRewardPerSecond[_aToken][_rewardToken] = _rewardsPerSecond;
         emit multiRewardUpdated(_aToken, _rewardToken, _rewardsPerSecond);
@@ -284,8 +281,8 @@ contract StandaloneMultiRewarder {
      * @param _rewardAddress The address of the reward token.
      * @param _amount The amount of reward tokens to deposit.
      */
-    function depositReward(address _rewardAddress, uint256 _amount) external onlyIncentiveAdmin {
-        IERC20(_rewardAddress).transferFrom(msg.sender, address(this), _amount);
+    function depositReward(address _rewardAddress, uint256 _amount) external onlyOwner {
+        IERC20(_rewardAddress).safeTransferFrom(msg.sender, address(this), _amount);
         emit multiRewardDeposited(_rewardAddress, _amount);
     }
 
@@ -294,8 +291,8 @@ contract StandaloneMultiRewarder {
      * @param _rewardAddress The address of the reward token.
      * @param _amount The amount of reward tokens to withdraw.
      */
-    function withdrawReward(address _rewardAddress, uint256 _amount) external onlyIncentiveAdmin {
-        IERC20(_rewardAddress).transfer(msg.sender, _amount);
+    function withdrawReward(address _rewardAddress, uint256 _amount) external onlyOwner {
+        IERC20(_rewardAddress).safeTransfer(msg.sender, _amount);
         emit multiRewardWithdrawn(_rewardAddress, _amount);
     }
 

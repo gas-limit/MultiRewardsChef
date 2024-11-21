@@ -11,7 +11,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
  * @dev A standalone multi-token reward distribution contract for staking tokens such as aTokens or LP tokens.
  * Users earn rewards in multiple tokens simultaneously, with flexible staking and admin controls.
  */
-contract StandaloneMultiRewarder is Ownable2Step {
+contract StandaloneMultiRewarderModern is Ownable2Step {
 
     using SafeERC20 for IERC20;
 

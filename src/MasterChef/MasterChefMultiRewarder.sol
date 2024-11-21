@@ -4,61 +4,86 @@ pragma solidity 0.7.6;
 import { SafeMath} from "../dependencies/openzeppelin/contracts/SafeMath.sol";
 import { IERC20 } from "../dependencies/openzeppelin/contracts/IERC20.sol";
 
+/**
+ * @title MasterchefMultiRewards
+ * @dev A contract to manage multi-token reward distribution for users staking aTokens or LP tokens.
+ * Enables flexible and accurate reward distribution with administrative control.
+ */
 contract MasterchefMultiRewards {
 
     using SafeMath for uint256;
 
-    address multiIncentiveAdmin;
+    /// @notice Address of the admin responsible for managing incentives
+    address public multiIncentiveAdmin;
 
-    // aToken address => total staked amount
+   /// @notice Maps aToken addresses to the total staked amount
     mapping(address => uint256) public multiTotalStaked;
-    // aToken address => staked amount
+
+    /// @notice Maps aToken and user addresses to the user's staked amount
     mapping(address => mapping(address => uint256)) public multiUserStaked;
-    // aToken address => rewardToken array
+
+    /// @notice Maps aToken addresses to an array of reward tokens
     mapping(address => address[]) public multiRewardTokens;
-    // rewardToken address => isMultiRewardToken
+
+    /// @notice Maps reward token addresses to a boolean indicating if it is a multi-reward token
     mapping(address => bool) public isMultiRewardToken;
-    // aTokenAddress => rewardTokenAddress => multiRewardPerToken
+
+    /// @notice Maps aToken and reward token addresses to the reward per token value
     mapping(address => mapping(address => uint256)) public multiRewardPerToken;
-    // user address => aToken address => reward address => multiRewardPerTokenOffsetScaled
-    mapping(address => mapping(address => mapping(address => uint256)))
-        public multiUserRewardOffset;
-    // user address => rewardToken address => accumulated rewards
+
+    /// @notice Tracks user-specific reward offsets for accurate calculations
+    mapping(address => mapping(address => mapping(address => uint256))) public multiUserRewardOffset;
+
+    /// @notice Tracks accumulated pending rewards for users per reward token
+
     mapping(address => mapping(address => uint256)) public multiUserPendingRewards;
-    // aToken address => rewardToken address => rewardPerSecond
+    
+    /// @notice Tracks reward rates per aToken and reward token
     mapping(address => mapping(address => uint256)) public multiRewardPerSecond;
-    // aToken address => rewardToken address => lastMultiUpdateTime
+    
+    /// @notice Tracks the last update time for rewards per aToken and reward token
     mapping(address => mapping(address => uint256)) public lastMultiUpdateTime;
 
     uint256 internal constant SCALE = 1e24;
 
-    event multiStakeRecorded(address user, address aToken, uint256 amount);
-    event multiUnstakeRecorded(address user, address aToken, uint256 amount);
+    /// @dev Emitted when a user stakes aTokens
+    event multiStakeRecorded(address indexed user, address indexed aToken, uint256 amount);
+    /// @dev Emitted when a user unstakes aTokens
+    event multiUnstakeRecorded(address indexed user, address indexed aToken, uint256 amount);
+    /// @dev Emitted when a user claims rewards
     event multiRewardHarvested(
-        address user,
-        address aToken,
-        address rewardToken,
+        address indexed user,
+        address indexed aToken,
+        address indexed rewardToken,
         uint256 amount
     );
+    /// @dev Emitted when a new reward token is added
     event multiRewardAdded(
-        address aToken,
-        address rewardToken,
+        address indexed aToken,
+        address indexed rewardToken,
         uint256 rewardsPerSecond
     );
-    event multiRewardRemoved(address aToken, address rewardToken);
+    /// @dev Emitted when a reward token is removed
+    event multiRewardRemoved(address indexed aToken, address indexed rewardToken);
+    /// @dev Emitted when a reward rate is updated
     event multiRewardUpdated(
-        address aToken,
-        address rewardToken,
+        address indexed aToken,
+        address indexed rewardToken,
         uint256 rewardsPerSecond
     );
-    event multiRewardDeposited(address rewardToken, uint256 amount);
-    event multiRewardWithdrawn(address rewardToken, uint256 amount);
+    /// @dev Emitted when reward tokens are deposited
+    event multiRewardDeposited(address indexed rewardToken, uint256 amount);
+    /// @dev Emitted when reward tokens are withdrawn
+    event multiRewardWithdrawn(address indexed rewardToken, uint256 amount);
 
     modifier onlyIncentiveAdmin() {
         require(msg.sender == multiIncentiveAdmin, "caller is not the multiIncentiveAdmin");
         _;
     }
 
+    /**
+     * @dev Initializes the contract and sets the deployer as the multiIncentiveAdmin.
+     */
     constructor() {
         multiIncentiveAdmin = msg.sender;
     }
@@ -67,7 +92,11 @@ contract MasterchefMultiRewards {
     //     USER FUNCTIONS
     // °✰════════════════════╛
 
-    // Stake aToken
+    /**
+     * @notice Stakes aTokens to participate in rewards.
+     * @param _aToken The address of the aToken being staked.
+     * @param _amount The amount of aTokens to stake.
+     */
     function stakeIncentiveTokens(address _aToken, uint256 _amount) internal {
         require(_amount > 0, "amount must be greater than 0");
         calculateUserPending(msg.sender, _aToken);
@@ -90,7 +119,11 @@ contract MasterchefMultiRewards {
         emit multiStakeRecorded(msg.sender, _aToken, _amount);
     }
 
-    // Withdraw aToken
+    /**
+     * @notice Withdraws staked aTokens and updates the reward accounting.
+     * @param _aToken The address of the aToken being unstaked.
+     * @param _amount The amount of aTokens to unstake.
+     */
     function _unstakeIncentiveTokens(address _aToken, uint256 _amount) internal {
         require(_amount > 0, "amount must be greater than 0");
         // assume check for sufficient staked amount is done in parent contract
@@ -103,7 +136,10 @@ contract MasterchefMultiRewards {
         emit multiUnstakeRecorded(msg.sender, _aToken, _amount);
     }
 
-    // Harvest rewards
+    /**
+     * @notice Claims all pending rewards for a user.
+     * @param _aToken The address of the aToken for which rewards are claimed.
+     */
     function _claimMultiRewards(address _aToken) internal {
         updateMultiRewardAccounting(_aToken);
         address[] memory rewardTokenList = multiRewardTokens[_aToken];
@@ -131,7 +167,10 @@ contract MasterchefMultiRewards {
     //     INTERNAL ACCOUNTING
     // °✰════════════════════════╛
 
-    // Update reward accounting
+    /**
+     * @notice Updates reward accounting for a specific aToken.
+     * @param _aToken The address of the aToken for which rewards are updated.
+     */
     function updateMultiRewardAccounting(address _aToken) internal {
         if(multiTotalStaked[_aToken] == 0) {
             return;
@@ -153,6 +192,11 @@ contract MasterchefMultiRewards {
         }
     }
 
+    /**
+     * @notice Calculates pending rewards for a user and updates their pending rewards.
+     * @param _user The address of the user.
+     * @param _aToken The address of the aToken for which pending rewards are calculated.
+     */
     function calculateUserPending(address _user, address _aToken) internal {
         (address[] memory rewardTokenList, uint256[] memory earnedAmounts) = previewEarned(
             _user,
@@ -169,7 +213,12 @@ contract MasterchefMultiRewards {
     //        ADMIN FUNCTIONS
     // °✰════════════════════════╛
 
-    // Add a new reward to a specific aToken
+    /**
+     * @notice Adds a new reward token for a specific aToken with a defined reward rate.
+     * @param _aToken The address of the aToken to associate with the reward token.
+     * @param _rewardToken The address of the reward token to add.
+     * @param _rewardsPerSecond The rate at which the reward token is distributed.
+     */
     function addIncentiveReward(
         address _aToken,
         address _rewardToken,
@@ -192,7 +241,11 @@ contract MasterchefMultiRewards {
         emit multiRewardAdded(_aToken, _rewardToken, _rewardsPerSecond);
     }
 
-    // Remove a reward from a specific aToken
+    /**
+     * @notice Removes a reward token from a specific aToken.
+     * @param _aToken The address of the aToken from which the reward token is removed.
+     * @param _rewardToken The address of the reward token to remove.
+     */
     function removeIncentiveReward(
         address _aToken,
         address _rewardToken
@@ -206,8 +259,12 @@ contract MasterchefMultiRewards {
         emit multiRewardRemoved(_aToken, _rewardToken);
     }
 
-
-    // Update reward per second for a specific aToken
+    /**
+     * @notice Updates the reward rate for a specific aToken and reward token.
+     * @param _aToken The address of the aToken.
+     * @param _rewardToken The address of the reward token.
+     * @param _rewardsPerSecond The new reward rate.
+     */
     function adjustRewardRate(address _aToken, address _rewardToken, uint256 _rewardsPerSecond) external onlyIncentiveAdmin {
         require(multiRewardPerSecond[_aToken][_rewardToken] != 0, "reward token does not exist");
         updateMultiRewardAccounting(_aToken);
@@ -215,11 +272,21 @@ contract MasterchefMultiRewards {
         emit multiRewardUpdated(_aToken, _rewardToken, _rewardsPerSecond);
     }
 
+    /**
+     * @notice Deposits reward tokens into the contract for distribution.
+     * @param _rewardAddress The address of the reward token to deposit.
+     * @param _amount The amount of reward tokens to deposit.
+     */
     function depositReward(address _rewardAddress, uint256 _amount) external onlyIncentiveAdmin {
         IERC20(_rewardAddress).transferFrom(msg.sender, address(this), _amount);
         emit multiRewardDeposited(_rewardAddress, _amount);
     }
 
+    /**
+     * @notice Withdraws reward tokens from the contract.
+     * @param _rewardAddress The address of the reward token to withdraw.
+     * @param _amount The amount of reward tokens to withdraw.
+     */
     function withdrawReward(address _rewardAddress, uint256 _amount) external onlyIncentiveAdmin {
         IERC20(_rewardAddress).transfer(msg.sender, _amount);
         emit multiRewardWithdrawn(_rewardAddress, _amount);
@@ -228,7 +295,14 @@ contract MasterchefMultiRewards {
     // ╒═════════════════════════✰°
     //     USER PREVIEW REWARDS
     // °✰════════════════════════╛
-    
+
+    /**
+     * @notice Previews the rewards earned by a user for a specific aToken.
+     * @param _user The address of the user.
+     * @param _aToken The address of the aToken for which rewards are previewed.
+     * @return multiRewardTokens_ The array of reward token addresses.
+     * @return earnedAmounts_ The array of earned amounts for each reward token.
+     */
     function previewEarned(address _user, address _aToken)
         public
         view
@@ -265,6 +339,13 @@ contract MasterchefMultiRewards {
         }
     }
 
+    /**
+     * @notice Simulates the reward per token for a specific aToken and reward token.
+     * @param _aToken The address of the aToken.
+     * @param _rewardToken The address of the reward token.
+     * @param totalStakedAmount The total amount of aTokens staked.
+     * @return simulatedRewardPerToken The simulated reward per token value.
+     */
     function _simulateRewardPerToken(
         address _aToken,
         address _rewardToken,
@@ -282,6 +363,15 @@ contract MasterchefMultiRewards {
         return simulatedRewardPerToken;
     }
 
+    /**
+     * @notice Calculates the earned rewards for a user based on their staked amount.
+     * @param _user The address of the user.
+     * @param _aToken The address of the aToken.
+     * @param _rewardToken The address of the reward token.
+     * @param simulatedRewardPerToken The simulated reward per token value.
+     * @param userStakedAmount The amount of aTokens staked by the user.
+     * @return earnedAmountActual The actual amount of rewards earned by the user.
+     */
     function _calculateEarnedAmount(
         address _user,
         address _aToken,
